@@ -40,4 +40,9 @@ If installation was successful, you just need to launch the program as the follo
 ```
 python listen.py -s wlan0 -l wlan1
 ```
-The script creates two folder: dumps (a directory for dumps of packets which was grabbed by -s interface) and logs (a directory for dumps of packets which was grabbed by -l interface).
+The script creates two folder:
+* dumps (a directory for dumps of packets which was grabbed by -s interface)
+
+![dumps](https://pp.userapi.com/c621707/v621707543/16ceb/ucy1oMvEkDE.jpg)
+
+* logs (a directory for dumps of packets which was grabbed by -l interface).
