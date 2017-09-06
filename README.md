@@ -35,5 +35,9 @@ python listen.py -l wlan0 -s wlan1
 python listen.py -h
 ```
 Look at launch example paragraph if you have any doubts about program usage.
-# 3.Tool's abilities and properties.
-# 4.Launch example.
+# 3.Launch example.
+If installation was successful, you just need to launch the program as the following one:
+```
+python listen.py -s wlan0 -l wlan1
+```
+The script creates two folder: dumps (a directory for dumps of packets which was grabbed by -s interface) and logs (a directory for dumps of packets which was grabbed by -l interface).
