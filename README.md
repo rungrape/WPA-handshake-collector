@@ -46,3 +46,5 @@ The script creates two folder:
 ![dumps](https://pp.userapi.com/c621707/v621707543/16ceb/ucy1oMvEkDE.jpg)
 
 * logs (a directory for dumps of packets which was grabbed by -l interface).
+
+![dumps](https://pp.userapi.com/c840331/v840331287/37a5/xlFvwDmpNhU.jpg)
