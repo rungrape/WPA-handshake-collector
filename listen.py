@@ -32,7 +32,7 @@ def start_AP(essid, bssid, netw_iface, path, channel):
         if bssid == b"\xff\xff\xff\xff\xff\xff":
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", netw_iface + "mon"])
         else:
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", netw_iface + "mon"])           
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", netw_iface + "mon"])
         timer = threading.Timer(3, kill, [cmd])
         try:
             timer.start()
@@ -229,10 +229,40 @@ def create_folders():
     subprocess.call(["mkdir", _new + "/logs"])
     return pwd + "/" + _new
 
+def get_available_wifaces():
+    wifaces = subprocess.run(["iwconfig"], capture_output=True)
+    print(wifaces.stdout)
+    with open("iwfaces.txt", "w") as fw:
+        fw.write(wifaces.stdout.decode('utf-8'))
+
+def get_mon_iface_name(iwfaces):
+    from re import findall
+    try:
+        new_iface = findall(r'monitor\smode\s.+enabled\son\s.+', iwfaces)[0]
+        new_iface = findall(r'[a-z0-9]+$', new_iface)[0]
+        return new_iface
+
+    except Exception as e:
+        print(str(e))
+        print("no new monitor interface found")
+        return ''
+
+def create_mon(netw_iface):
+    from random import randint
+    output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
+    iwfaces = output.stdout.decode('utf-8')
+    new_mon = get_mon_iface_name(iwfaces)
+    print(new_mon)
+
+
 
 if __name__ == "__main__":
     import sys
+    parser = create_parser()
+    namespace = parser.parse_args(sys.argv[1:]) 
+    create_mon(namespace.send)
 
+def biba():
     parser = create_parser()
     namespace = parser.parse_args(sys.argv[1:])
  
