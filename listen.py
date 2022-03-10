@@ -3,6 +3,7 @@ from time import sleep
 import threading
 from binascii import unhexlify, hexlify
 import argparse
+import os
 
 cache = []
 
@@ -209,10 +210,29 @@ def create_parser():
 
     return parser
 
+def create_folders():
+    '''
+    create folders
+        current_timendate/
+                        logs/ - false AP interaction dumps
+                        dumps/ - simple air sniffing dunps
+    input:
+        no
+    output:
+        $PWD/current_timendate
+    '''
+    import datetime
+    pwd = os.getcwd()
+    _new = str(datetime.datetime.now())
+    subprocess.call(["mkdir", _new])
+    subprocess.call(["mkdir", _new + "/dumps"])
+    subprocess.call(["mkdir", _new + "/logs"])
+    return pwd + "/" + _new
 
 
 if __name__ == "__main__":
     import sys
+
     parser = create_parser()
     namespace = parser.parse_args(sys.argv[1:])
  
@@ -221,17 +241,10 @@ if __name__ == "__main__":
         exit(1)
 
     try:
-        try:
-        	subprocess.call(["mkdir", "dumps"])
-        	subprocess.call(["mkdir", "logs"])
-
-        except Exception,e:
-            print str(e)
+        cwd = create_folders()
     	# ----------------------
     	itera = 0
     	while True:
-	        import os
-	    	cwd = os.getcwd()
         	os.chdir(cwd + "/dumps/")
 	        # ----------
     		for i in range(1, dump_num + 1):
