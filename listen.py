@@ -24,7 +24,9 @@ def start_AP(essid, bssid, netw_iface, path, channel):
     '''
     try:
         import subprocess
-        subprocess.check_call(["airmon-ng", "start", netw_iface, channel])
+        output = subprocess.run(["airmon-ng", "start", netw_iface, channel], capture_output=True)
+        iwfaces = output.stdout.decode('utf-8')
+        netw_iface = get_mon_iface_name(iwfaces)
         
         kill = lambda process: process.terminate()
         import os
@@ -178,7 +180,9 @@ def start_mon(netw_iface, path):
     os.chdir(path + "/dumps/")
     i = 0
     from random import randint
-    subprocess.call(["airmon-ng", "start", netw_iface, str(randint(1, 14))])
+    output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
+    iwfaces = output.stdout.decode('utf-8')
+    netw_iface = get_mon_iface_name(iwfaces)
     try:
         while i < dump_num:
             os.chdir(path + "/dumps/")
@@ -247,22 +251,9 @@ def get_mon_iface_name(iwfaces):
         print("no new monitor interface found")
         return ''
 
-def create_mon(netw_iface):
-    from random import randint
-    output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
-    iwfaces = output.stdout.decode('utf-8')
-    new_mon = get_mon_iface_name(iwfaces)
-    print(new_mon)
-
-
 
 if __name__ == "__main__":
     import sys
-    parser = create_parser()
-    namespace = parser.parse_args(sys.argv[1:]) 
-    create_mon(namespace.send)
-
-def biba():
     parser = create_parser()
     namespace = parser.parse_args(sys.argv[1:])
  
