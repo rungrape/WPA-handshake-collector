@@ -162,7 +162,7 @@ def start_sniff(netw_iface, path):
 
 
 def timeout(p):
-	p.kill()
+    p.kill()
 
 
 def start_mon(netw_iface, path):
@@ -180,20 +180,20 @@ def start_mon(netw_iface, path):
     from random import randint
     subprocess.call(["airmon-ng", "start", netw_iface, str(randint(1, 14))])
     try:
-    	while i < dump_num:
-			os.chdir(path + "/dumps/")
-			kill = lambda process: process.terminate()
-			cmd = subprocess.Popen(["airodump-ng", netw_iface + "mon", "--beacons", "--write", "beac_dump"])
-			timer = threading.Timer(5, kill, [cmd])
-			try:
-				timer.start()
-				stdout, stderr = cmd.communicate()
-			finally:
-				timer.cancel()
-			i += 1
+        while i < dump_num:
+            os.chdir(path + "/dumps/")
+            kill = lambda process: process.terminate()
+            cmd = subprocess.Popen(["airodump-ng", netw_iface + "mon", "--beacons", "--write", "beac_dump"])
+            timer = threading.Timer(5, kill, [cmd])
+            try:
+                timer.start()
+                stdout, stderr = cmd.communicate()
+            finally:
+                timer.cancel()
+            i += 1
 
     except KeyboardInterrupt:
-    	exit(1)
+        exit(1)
 
 
 def create_parser():
@@ -242,29 +242,29 @@ if __name__ == "__main__":
 
     try:
         cwd = create_folders()
-    	# ----------------------
-    	itera = 0
-    	while True:
-        	os.chdir(cwd + "/dumps/")
-	        # ----------
-    		for i in range(1, dump_num + 1):
-    			extensions = [".cap", ".kismet.csv", ".csv", ".kismet.netxml"]
-    			for ext in extensions:
-    				try:
-    					subprocess.call(["rm", "beac_dump-0" + str(i) + ext])
-    				
-    				except Exception,e:
-    					t = 10
-        	# ----------
-	        task1 = threading.Thread(target = start_mon, args=(namespace.send, cwd))
-	        task2 = threading.Thread(target = start_sniff, args=(namespace.listen, cwd))
-	        task1.start()
-	        task2.start()
-	        while True:
-	        	if not(task1.isAlive()) and not(task2.isAlive()):
-	        		break
-        	os.chdir(cwd)
-	        itera += 1
+        # ----------------------
+        itera = 0
+        while True:
+            os.chdir(cwd + "/dumps/")
+            # ----------
+            for i in range(1, dump_num + 1):
+                extensions = [".cap", ".kismet.csv", ".csv", ".kismet.netxml"]
+                for ext in extensions:
+                    try:
+                        subprocess.call(["rm", "beac_dump-0" + str(i) + ext])
+                    
+                    except Exception,e:
+                        t = 10
+            # ----------
+            task1 = threading.Thread(target = start_mon, args=(namespace.send, cwd))
+            task2 = threading.Thread(target = start_sniff, args=(namespace.listen, cwd))
+            task1.start()
+            task2.start()
+            while True:
+                if not(task1.isAlive()) and not(task2.isAlive()):
+                    break
+            os.chdir(cwd)
+            itera += 1
 
     except Exception,e:
             print str(e)
