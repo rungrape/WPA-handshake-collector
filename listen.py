@@ -195,24 +195,25 @@ def start_mon(netw_iface, path):
     	exit(1)
 
 
-def createParser():
+def create_parser():
     '''
     create parser identity to parse cmd args
     input:
         no
     output:
-        no
+        parser identity
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument ('-s', '--send', type=str, default = '', help='name of the interface that is to be used for listening')
-    parser.add_argument ('-l', '--listen', type=str, default = '', help = 'name of the interface that is going to be used for creating AP and for sending deauth packets')
+    parser.add_argument ('-l', '--listen', type=str, default = '', help = 'name of the interface that is to be used for creating AP and sending deauth packets')
+
     return parser
 
 
 
 if __name__ == "__main__":
     import sys
-    parser = createParser()
+    parser = create_parser()
     namespace = parser.parse_args(sys.argv[1:])
  
     if namespace.send == '' or namespace.listen == '':
