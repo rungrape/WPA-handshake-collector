@@ -44,8 +44,8 @@ def start_AP(essid, bssid, netw_iface, path, channel):
             subprocess.check_call(["airmon-ng", "stop", netw_iface + "mon", channel])
             #subprocess.call(["python", path + "/converter_p.2.7.py", essid + "_log-01.cap", "hccap"])
 
-    except Exception, e:
-       print e
+    except Exception as e:
+       print (e)
 
 
 def lookup_dump(pcap_dump, netw_iface, path):
@@ -61,7 +61,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
     packet_index = -1
     error_index = 0
     flag = False
-    print "\n" + pcap_dump + " file is being investigated\n"
+    print ("\n" + pcap_dump + " file is being investigated\n")
     try:
         while True:
             try:
@@ -82,7 +82,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
                         if essid_len != 0:
                             current_essid = (unhexlify(packets[packet_index][1].packet)[38: 38 + essid_len]).encode("ascii")
                             if (unhexlify(packets[packet_index][1].packet)[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
-                                print "in "  + str(packet_index + 1) + " ESSID " + current_essid + " found"
+                                print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
                                 cache.append(current_essid)
                                 # ------
                                 from threading import Thread
@@ -100,7 +100,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
                         if essid_len != 0:
                             current_essid = (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]).encode("ascii")
                             if (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
-                                print "in "  + str(packet_index + 1) + " ESSID " + current_essid + " found"
+                                print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
                                 cache.append(current_essid)
                                 # ------
                                 from threading import Thread
@@ -113,24 +113,24 @@ def lookup_dump(pcap_dump, netw_iface, path):
                 f.close()
 
             except IOError:
-                print "File is not ready yet...\n"
+                print ("File is not ready yet...\n")
                 sleep(2)
                 # --------
                 if error_index == 15:
-                    print "\nWaited too long, trying to scan the next file\n"
+                    print ("\nWaited too long, trying to scan the next file\n")
                     return 0
                 # --------
                 error_index += 1
 
             except IndexError:
                 if flag == True:
-                    print "Scan is done\n"
+                    print ("Scan is done\n")
                     break
                 else:
                     flag = True
                     packet_index = -1
 
-            except Exception,e:
+            except Exception as e:
                 t = 10
 
     except KeyboardInterrupt:
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     namespace = parser.parse_args(sys.argv[1:])
  
     if namespace.send == '' or namespace.listen == '':
-        print '\ninvalid input params\n'
+        print ('\ninvalid input params\n')
         exit(1)
 
     try:
@@ -253,7 +253,7 @@ if __name__ == "__main__":
                     try:
                         subprocess.call(["rm", "beac_dump-0" + str(i) + ext])
                     
-                    except Exception,e:
+                    except Exception as e:
                         t = 10
             # ----------
             task1 = threading.Thread(target = start_mon, args=(namespace.send, cwd))
@@ -266,5 +266,5 @@ if __name__ == "__main__":
             os.chdir(cwd)
             itera += 1
 
-    except Exception,e:
-            print str(e)
+    except Exception as e:
+            print (str(e))
