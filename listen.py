@@ -9,6 +9,62 @@ cache = []
 
 dump_num = 1
 
+class logger:
+
+    def __init__(self, log = 'C:\\Users\\dzyubin.vla\\log.txt', \
+                        errors = 'C:\\Users\\dzyubin.vla\\errors.txt'):
+        '''
+        log - информация
+        errors - ошибки
+        '''
+        self.log = cwd + "log.txt"
+        self.errors = cwd + "errors.txt"
+        self.clean()
+
+    def clean(self):
+        '''
+        очищаем файлы перед созданием новой сущности
+        '''
+        l = open(self.log, 'w', encoding='utf-8')
+        l.write('')
+        l.close()
+        r = open(self.errors, 'w', encoding='utf-8')
+        r.write('')
+        r.close()
+
+    def addLineToLog(self, line):
+        '''
+        (метод не обязательный, для отладки)
+        регистрация события
+        line - словарь с событием
+        '''
+        f = open(self.log, 'a', encoding='utf-8')
+        f.write('\nProcessing  ' + line['function'] + '\n')
+        f.write('\tOutput:  ' + line['output'] + '\n')
+        f.write('-----------------------------------------------')
+        f.close()
+
+    def addLineToErr(self, line):
+        '''
+        регистрация ошибки
+        line - словарь с событием
+        '''
+        self.log = 'C:\\Users\\dzyubin.vla\\errors.txt'
+        self.addLineToLog(line)
+        self.log = 'C:\\Users\\dzyubin.vla\\log.txt'
+
+    def addToLine(self, function, output):
+        '''
+        (метод не обязательный, для отладки)
+        создание события для вывода в лог
+        function - где произошло
+        output - что именно печатаем
+        '''
+        d = dict()
+        d['function'] = function
+        d['output'] = output
+        return d
+
 
 def start_AP(essid, bssid, netw_iface, path, channel):
     '''
@@ -26,24 +82,24 @@ def start_AP(essid, bssid, netw_iface, path, channel):
         import subprocess
         output = subprocess.run(["airmon-ng", "start", netw_iface, channel], capture_output=True)
         iwfaces = output.stdout.decode('utf-8')
-        netw_iface = get_mon_iface_name(iwfaces)
+        new_iface = get_mon_iface_name(iwfaces)
         
         kill = lambda process: process.terminate()
         import os
         os.chdir(path + "/logs/")
         if bssid == b"\xff\xff\xff\xff\xff\xff":
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", netw_iface + "mon"])
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_iface])
         else:
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", netw_iface + "mon"])
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_iface])
         timer = threading.Timer(3, kill, [cmd])
         try:
             timer.start()
             if (bssid) != b"\xff\xff\xff\xff\xff\xff":
-                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", netw_iface + "mon"])
+                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", new_iface])
             stdout, stderr = cmd.communicate()
         finally:
             timer.cancel()
-            subprocess.check_call(["airmon-ng", "stop", netw_iface + "mon", channel])
+            subprocess.check_call(["airmon-ng", "stop", new_iface, channel])
             #subprocess.call(["python", path + "/converter_p.2.7.py", essid + "_log-01.cap", "hccap"])
 
     except Exception as e:
@@ -182,12 +238,12 @@ def start_mon(netw_iface, path):
     from random import randint
     output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
     iwfaces = output.stdout.decode('utf-8')
-    netw_iface = get_mon_iface_name(iwfaces)
+    new_iface = get_mon_iface_name(iwfaces)
     try:
         while i < dump_num:
             os.chdir(path + "/dumps/")
             kill = lambda process: process.terminate()
-            cmd = subprocess.Popen(["airodump-ng", netw_iface + "mon", "--beacons", "--write", "beac_dump"])
+            cmd = subprocess.Popen(["airodump-ng", new_iface, "--beacons", "--write", "beac_dump"])
             timer = threading.Timer(5, kill, [cmd])
             try:
                 timer.start()
