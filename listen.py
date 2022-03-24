@@ -318,21 +318,16 @@ if __name__ == "__main__":
         exit(1)
 
     try:
-        cwd = create_folders()
+        # delete recent dump files
+        print(os.getcwd()+'/del_recent_dumps.sh')
+        exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
         # ----------------------
         itera = 0
         while True:
+            cwd = create_folders()
+            os.chdir(cwd)
+            # ----------
             os.chdir(cwd + "/dumps/")
-            # ----------
-            for i in range(1, dump_num + 1):
-                extensions = [".cap", ".kismet.csv", ".csv", ".kismet.netxml"]
-                for ext in extensions:
-                    try:
-                        subprocess.call(["rm", "beac_dump-0" + str(i) + ext])
-                    
-                    except Exception as e:
-                        t = 10
-            # ----------
             task1 = threading.Thread(target = start_mon, args=(namespace.send, cwd))
             task2 = threading.Thread(target = start_sniff, args=(namespace.listen, cwd))
             task1.start()
