@@ -7,7 +7,7 @@ import os
 
 cache = []
 
-dump_num = 1
+dump_num = 2
 
 class Logger:
 
@@ -259,6 +259,7 @@ def start_sniffer(netw_iface, path, logger):
     output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
     iwfaces = output.stdout.decode('utf-8')
     new_iface = get_mon_iface_name(iwfaces)
+    logger.addToLine('start_sniffer', "new interface " + new_iface, 'log')
     # --
     import os
     os.chdir(path + "/sniffed/")
@@ -275,6 +276,8 @@ def start_sniffer(netw_iface, path, logger):
             finally:
                 timer.cancel()
             i += 1
+        subprocess.run(["airmon-ng", "stop", new_iface], capture_output=False)
+        logger.addToLine('start_sniffer', "sniffing has been finished", 'log')
 
     except Exception as e:
         logger.addToLine('start_sniffer', str(e), 'error')
@@ -357,10 +360,12 @@ if __name__ == "__main__":
             task1 = threading.Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = threading.Thread(target = start_sender, args=(namespace.send, cwd, logger))
             task1.start()
-            task2.start()
-            while True:
-                if not(task1.is_alive()) and not(task2.is_alive()):
-                    break
+            sleep(5)
+            # task2.start()
+            logger.addToLine('__main__', 'task1.is_alive: ' + str(task1.is_alive()), 'log')
+            logger.addToLine('__main__', 'task2.is_alive: ' + str(task2.is_alive()), 'log')
+            if not (task1.is_alive() and task2.is_alive()):
+                break
 
     except Exception as e:
         logger.addToLine('__main__', str(e), 'error')
