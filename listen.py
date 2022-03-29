@@ -217,7 +217,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
         exit(1)
 
 
-def start_sniff(netw_iface, path):
+def start_sender(netw_iface, path):
     '''
     lookup for pcap dump files in /logs folder
     input:
@@ -245,7 +245,7 @@ def timeout(p):
     p.kill()
 
 
-def start_mon(netw_iface, path):
+def start_sniffer(netw_iface, path):
     '''
     monitor broadcast and save anything to pcap dump files in /logs folder
     input:
@@ -340,7 +340,6 @@ if __name__ == "__main__":
     logger = Logger()
  
     if not (namespace.send and namespace.listen):
-        print(123)
         logger.addToLine('__main__', 'invalid input params\n', 'error')
         exit(1)
 
@@ -348,22 +347,19 @@ if __name__ == "__main__":
         # delete recent dump files
         logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
         exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
-        # ----------------------
-        itera = 0
+        # --
+        # create dump folders and enter
+        cwd = create_folders()
+        os.chdir(cwd)
         while True:
-            cwd = create_folders()
-            os.chdir(cwd)
-            # ----------
-            os.chdir(cwd + "/dumps/")
-            task1 = threading.Thread(target = start_mon, args=(namespace.send, cwd))
-            task2 = threading.Thread(target = start_sniff, args=(namespace.listen, cwd))
+            task1 = threading.Thread(target = start_sniffer, args=(namespace.listen, cwd))
+            task2 = threading.Thread(target = start_sender, args=(namespace.send, cwd))
             task1.start()
             task2.start()
             while True:
-                if not(task1.isAlive()) and not(task2.isAlive()):
+                if not(task1.is_alive()) and not(task2.is_alive()):
                     break
-            os.chdir(cwd)
-            itera += 1
 
     except Exception as e:
-            print (str(e))
+        logger.addToLine('__main__', str(e), 'error')
+
