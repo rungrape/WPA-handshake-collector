@@ -128,7 +128,7 @@ def start_AP(essid, bssid, netw_iface, path, channel):
        print (e)
 
 
-def lookup_dump(pcap_dump, netw_iface, path):
+def lookup_dump(pcap_dump, netw_iface, path, logger):
     '''
     lookup pcap dump and collect AP's and client's beacon packets
     input:
@@ -141,7 +141,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
     packet_index = -1
     error_index = 0
     flag = False
-    print ("\n" + pcap_dump + " file is being investigated\n")
+    logger.addToLine('lookup_dump', pcap_dump + " file is being investigated", 'log')
     try:
         while True:
             try:
@@ -193,10 +193,11 @@ def lookup_dump(pcap_dump, netw_iface, path):
                 f.close()
 
             except IOError:
-                print ("File is not ready yet...\n")
+                logger.addToLine('lookup_dump', pcap_dump + " file is not ready yet...", 'log')
                 sleep(2)
                 # --------
-                if error_index == 15:
+                if error_index == 5:
+                    logger.addToLine('lookup_dump', "Waited too long, trying to scan the next file", 'err')
                     print ("\nWaited too long, trying to scan the next file\n")
                     return 0
                 # --------
@@ -204,7 +205,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
 
             except IndexError:
                 if flag == True:
-                    print ("Scan is done\n")
+                    logger.addToLine('lookup_dump', 'Scan is done', 'log')
                     break
                 else:
                     flag = True
@@ -217,7 +218,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
         exit(1)
 
 
-def start_sender(netw_iface, path):
+def start_sender(netw_iface, path, logger):
     '''
     lookup for pcap dump files in /logs folder
     input:
@@ -237,7 +238,7 @@ def start_sender(netw_iface, path):
         else:
             dump = "beac_dump-" + str(i) + ".cap"
 
-        lookup_dump(dump, netw_iface, path)
+        lookup_dump(dump, netw_iface, path, logger)
         i += 1
 
 
