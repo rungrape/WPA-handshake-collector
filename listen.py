@@ -145,7 +145,7 @@ def lookup_dump(pcap_dump, netw_iface, path):
     try:
         while True:
             try:
-                f = open(path + "/dumps/" + pcap_dump, 'rb')
+                f = open(path + "/sniffed/" + pcap_dump, 'rb')
                 from pcapParser import load_savefile
                 caps, header = load_savefile(f)
                 packets = caps.packets
@@ -245,7 +245,7 @@ def timeout(p):
     p.kill()
 
 
-def start_sniffer(netw_iface, path):
+def start_sniffer(netw_iface, path, logger):
     '''
     monitor broadcast and save anything to pcap dump files in /logs folder
     input:
@@ -254,16 +254,17 @@ def start_sniffer(netw_iface, path):
     output:
         no
     '''
-    import os
-    os.chdir(path + "/dumps/")
-    i = 0
     from random import randint
     output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
     iwfaces = output.stdout.decode('utf-8')
     new_iface = get_mon_iface_name(iwfaces)
+    # --
+    import os
+    os.chdir(path + "/sniffed/")
+    i = 0
     try:
         while i < dump_num:
-            os.chdir(path + "/dumps/")
+            os.chdir(path + "/sniffed/")
             kill = lambda process: process.terminate()
             cmd = subprocess.Popen(["airodump-ng", new_iface, "--beacons", "--write", "beac_dump"])
             timer = threading.Timer(5, kill, [cmd])
@@ -274,8 +275,8 @@ def start_sniffer(netw_iface, path):
                 timer.cancel()
             i += 1
 
-    except KeyboardInterrupt:
-        exit(1)
+    except Exception as e:
+        logger.addToLine('start_sniffer', str(e), 'error')
 
 
 def create_parser():
@@ -308,7 +309,7 @@ def create_folders():
     pwd = os.getcwd()
     _new = str(datetime.datetime.now())
     subprocess.call(["mkdir", _new])
-    subprocess.call(["mkdir", _new + "/dumps"])
+    subprocess.call(["mkdir", _new + "/sniffed"])
     subprocess.call(["mkdir", _new + "/logs"])
     return pwd + "/" + _new
 
@@ -352,8 +353,8 @@ if __name__ == "__main__":
         cwd = create_folders()
         os.chdir(cwd)
         while True:
-            task1 = threading.Thread(target = start_sniffer, args=(namespace.listen, cwd))
-            task2 = threading.Thread(target = start_sender, args=(namespace.send, cwd))
+            task1 = threading.Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
+            task2 = threading.Thread(target = start_sender, args=(namespace.send, cwd, logger))
             task1.start()
             task2.start()
             while True:
