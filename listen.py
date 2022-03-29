@@ -9,28 +9,37 @@ cache = []
 
 dump_num = 1
 
-class logger:
+class Logger:
 
-    def __init__(self, log = 'C:\\Users\\dzyubin.vla\\log.txt', \
-                        errors = 'C:\\Users\\dzyubin.vla\\errors.txt'):
+    def __init__(self, log=None, err=None):
         '''
         log - информация
         errors - ошибки
         '''
-        self.log = cwd + "log.txt"
-        self.errors = cwd + "errors.txt"
+        self.log, self.err =\
+            Logger.checkParams(log, err)
         self.clean()
+
+    @staticmethod
+    def checkParams(log, err):
+        if not (log and err):
+            import platform
+            if str(platform.system()) == 'Linux':
+                log = log if log else '/tmp/log.txt'
+                err = err if err else '/tmp/err.txt'
+            elif str(platform.system()) == 'Windows':
+                # TODO: find out which Win dirs are available to be written in
+                log = log if log else '/tmp/log.txt'
+                err = err if err else '/tmp/err.txt'
+        return log, err
 
     def clean(self):
         '''
         очищаем файлы перед созданием новой сущности
         '''
-        l = open(self.log, 'w', encoding='utf-8')
-        l.write('')
-        l.close()
-        r = open(self.errors, 'w', encoding='utf-8')
-        r.write('')
-        r.close()
+        for _i in self.__dict__:
+            with open(self.__dict__[_i], 'w', encoding='utf-8') as fw:
+                fw.write('')
 
     def addLineToLog(self, line):
         '''
@@ -38,32 +47,45 @@ class logger:
         регистрация события
         line - словарь с событием
         '''
-        f = open(self.log, 'a', encoding='utf-8')
-        f.write('\nProcessing  ' + line['function'] + '\n')
-        f.write('\tOutput:  ' + line['output'] + '\n')
-        f.write('-----------------------------------------------')
-        f.close()
+        with open(self.log, 'a', encoding='utf-8') as fw:
+            import datetime
+            message = '--\n' + str(datetime.datetime.now()) + '\n'\
+                    '\t1.Processing\n' +\
+                    '\t\t' + line['function'] + '\n'\
+                    '\t2.Output\n' +\
+                    '\t\t' + line['output'] + '\n'
+            fw.write(message)
 
     def addLineToErr(self, line):
         '''
-        регистрация ошибки
+        (метод не обязательный, для отладки)
+        регистрация события
         line - словарь с событием
         '''
-        self.log = 'C:\\Users\\dzyubin.vla\\errors.txt'
-        self.addLineToLog(line)
-        self.log = 'C:\\Users\\dzyubin.vla\\log.txt'
+        with open(self.err, 'a', encoding='utf-8') as fw:
+            import datetime
+            message = '--\n' + str(datetime.datetime.now()) + '\n'\
+                    '\t1.Processing\n' +\
+                    '\t\t' + line['function'] + '\n'\
+                    '\t2.Output\n' +\
+                    '\t\t' + line['output'] + '\n'
+            fw.write(message)
 
-    def addToLine(self, function, output):
+    def addToLine(self, function, output, level):
         '''
         (метод не обязательный, для отладки)
         создание события для вывода в лог
         function - где произошло
         output - что именно печатаем
+        level - 'error' or 'log', logging level
         '''
         d = dict()
         d['function'] = function
         d['output'] = output
-        return d
+        if level == 'error':
+            self.addLineToErr(d)
+        elif level == 'log':
+            self.addLineToLog(d)
 
 
 def start_AP(essid, bssid, netw_iface, path, channel):
@@ -270,6 +292,7 @@ def create_parser():
 
     return parser
 
+
 def create_folders():
     '''
     create folders
@@ -289,11 +312,13 @@ def create_folders():
     subprocess.call(["mkdir", _new + "/logs"])
     return pwd + "/" + _new
 
+
 def get_available_wifaces():
     wifaces = subprocess.run(["iwconfig"], capture_output=True)
     print(wifaces.stdout)
     with open("iwfaces.txt", "w") as fw:
         fw.write(wifaces.stdout.decode('utf-8'))
+
 
 def get_mon_iface_name(iwfaces):
     from re import findall
@@ -312,14 +337,16 @@ if __name__ == "__main__":
     import sys
     parser = create_parser()
     namespace = parser.parse_args(sys.argv[1:])
+    logger = Logger()
  
-    if namespace.send == '' or namespace.listen == '':
-        print ('\ninvalid input params\n')
+    if not (namespace.send and namespace.listen):
+        print(123)
+        logger.addToLine('__main__', 'invalid input params\n', 'error')
         exit(1)
 
     try:
         # delete recent dump files
-        print(os.getcwd()+'/del_recent_dumps.sh')
+        logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
         exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
         # ----------------------
         itera = 0
