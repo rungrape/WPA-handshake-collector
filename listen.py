@@ -5,6 +5,8 @@ from binascii import unhexlify, hexlify
 import argparse
 import os
 
+lock = Lock()
+
 cache = []
 
 dump_num = 2
@@ -88,7 +90,7 @@ class Logger:
             self.addLineToLog(d)
 
 
-class Monitors():
+class Monitor():
     '''Newtork entity of airmon-ng for promiscuous listening'''
     def __init__(self, logger):
         '''
@@ -98,15 +100,13 @@ class Monitors():
             logger
 
         '''
-        self.monitors = list()
         self.log_client = logger
 
     @property
     def logger(self):
         return self.log_client
 
-    @staticmethod
-    def get_mon_iface_name(iwfaces):
+    def get_mon_iface_name(self, iwfaces):
         from re import findall
         try:
             new_iface = findall(r'monitor\smode\s.+enabled\son\s.+', iwfaces)[0]
@@ -114,8 +114,10 @@ class Monitors():
             return new_iface
 
         except Exception as e:
+            lock.acquire()
             self.log_client.addToLine('Monitors.get_mon_iface_name',\
                 "no new monitor interface found " + str(e), 'error')
+            lock.release()
             return ''
 
     def push(self, netw_iface):
@@ -127,17 +129,15 @@ class Monitors():
             new monitor interface 
         '''
         import subprocess
+        from random import randint
         air_out = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
         air_out = air_out.stdout.decode('utf-8')
-        new_iface = Monitors.get_mon_iface_name(air_out)
-        self.monitors.push(new_iface)
+        new_iface = self.get_mon_iface_name(air_out)
         return new_iface
 
     def pop(self, mon):
         import subprocess
         subprocess.run(["airmon-ng", "stop", mon], capture_output=False)
-        self.monitors.pop(mon)
-
 
 
 
@@ -297,7 +297,7 @@ def timeout(p):
     p.kill()
 
 
-def start_sniffer(netw_iface, path, monitors):
+def start_sniffer(netw_iface, path, logger):
     '''
     monitor broadcast and save anything to pcap dump files in /logs folder
     input:
@@ -306,8 +306,11 @@ def start_sniffer(netw_iface, path, monitors):
     output:
         no
     '''
-    new_mon = monitors.push(netw_iface)
-    monitors.logger.addToLine('start_sniffer', "new interface " + new_mon, 'log')
+    mon = Monitor(logger)
+    new_mon = mon.push(netw_iface)
+    lock.acquire()
+    mon.logger.addToLine('start_sniffer', "new interface " + new_mon, 'log')
+    lock.release()
     # --
     import os
     os.chdir(path + "/sniffed/")
@@ -316,7 +319,7 @@ def start_sniffer(netw_iface, path, monitors):
         while i < dump_num:
             os.chdir(path + "/sniffed/")
             kill = lambda process: process.terminate()
-            cmd = subprocess.Popen(["airodump-ng", new_iface, "--beacons", "--write", "beac_dump"])
+            cmd = subprocess.Popen(["airodump-ng", new_mon, "--beacons", "--write", "beac_dump"])
             timer = Timer(5, kill, [cmd])
             try:
                 timer.start()
@@ -324,11 +327,17 @@ def start_sniffer(netw_iface, path, monitors):
             finally:
                 timer.cancel()
             i += 1
-        monitors.pop(new_mon)
-        monitors.logger.addToLine('start_sniffer', "sniffing has been finished", 'log')
+        mon.pop(new_mon)
+        lock.acquire()
+        mon.logger.addToLine('start_sniffer', "sniffing has been finished", 'log')
+        lock.release()
 
     except Exception as e:
-        monitors.logger.addToLine('start_sniffer', str(e), 'error')
+        import traceback
+        tb = traceback.format_exc()
+        lock.acquire()
+        mon.logger.addToLine('start_sniffer', str(e) + '\n' + str(tb), 'error')
+        lock.release()
 
 
 def create_parser():
@@ -373,7 +382,6 @@ def get_available_wifaces():
         fw.write(wifaces.stdout.decode('utf-8'))
 
 
-
 if __name__ == "__main__":
     import sys
     parser = create_parser()
@@ -381,30 +389,36 @@ if __name__ == "__main__":
     logger = Logger()
  
     if not (namespace.send and namespace.listen):
+        lock.acquire()
         logger.addToLine('__main__', 'invalid input params\n', 'error')
+        lock.release()
         exit(1)
     try:
         # delete recent dump files
+        lock.acquire()
         logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
+        lock.release()
         exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
         # --
         # create dump folders and enter
         cwd = create_folders()
         os.chdir(cwd)
         while True:
-            print(1)
-            monitors = Monitors(logger)
-            print(2)
-            task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, monitors))
+            task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
             task1.start()
             sleep(5)
             # task2.start()
+            lock.acquire()
             logger.addToLine('__main__', 'task1.is_alive: ' + str(task1.is_alive()), 'log')
             logger.addToLine('__main__', 'task2.is_alive: ' + str(task2.is_alive()), 'log')
+            lock.release()
             if not (task1.is_alive() and task2.is_alive()):
                 break
 
     except Exception as e:
-        logger.addToLine('__main__', str(e), 'error')
+        import traceback
+        tb = traceback.format_exc()
+        logger.addToLine('__main__', str(e) + '\n' + str(tb), 'error')
+
 
