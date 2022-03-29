@@ -1,6 +1,6 @@
 import subprocess
 from time import sleep
-import threading
+from threading import Thread, Lock, Timer
 from binascii import unhexlify, hexlify
 import argparse
 import os
@@ -88,6 +88,59 @@ class Logger:
             self.addLineToLog(d)
 
 
+class Monitors():
+    '''Newtork entity of airmon-ng for promiscuous listening'''
+    def __init__(self, logger):
+        '''
+        input:
+            logger - logging object
+        fields:
+            logger
+
+        '''
+        self.monitors = list()
+        self.log_client = logger
+
+    @property
+    def logger(self):
+        return self.log_client
+
+    @staticmethod
+    def get_mon_iface_name(iwfaces):
+        from re import findall
+        try:
+            new_iface = findall(r'monitor\smode\s.+enabled\son\s.+', iwfaces)[0]
+            new_iface = findall(r'[a-z0-9]+$', new_iface)[0]
+            return new_iface
+
+        except Exception as e:
+            self.log_client.addToLine('Monitors.get_mon_iface_name',\
+                "no new monitor interface found " + str(e), 'error')
+            return ''
+
+    def push(self, netw_iface):
+        '''
+        add new monitor
+        input:
+            netw_iface - name of used network interface
+        output:
+            new monitor interface 
+        '''
+        import subprocess
+        air_out = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
+        air_out = air_out.stdout.decode('utf-8')
+        new_iface = Monitors.get_mon_iface_name(air_out)
+        self.monitors.push(new_iface)
+        return new_iface
+
+    def pop(self, mon):
+        import subprocess
+        subprocess.run(["airmon-ng", "stop", mon], capture_output=False)
+        self.monitors.pop(mon)
+
+
+
+
 def start_AP(essid, bssid, netw_iface, path, channel):
     '''
     start new access point with certain parameters
@@ -165,7 +218,6 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
                                 cache.append(current_essid)
                                 # ------
-                                from threading import Thread
                                 bssid = unhexlify((packets[packet_index][1].packet))[16: 22]
                                 rates_len = int(unhexlify(packets[packet_index][1].packet)[38 + essid_len + 1].encode("hex"), 16)
                                 channel = int(unhexlify((packets[packet_index][1].packet))[38 + essid_len + 1 + rates_len + 1 + 1 + 1].encode("hex"), 16)
@@ -183,7 +235,6 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
                                 cache.append(current_essid)
                                 # ------
-                                from threading import Thread
                                 task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1)))
                                 task_AP.start()
                         # ---------
@@ -246,7 +297,7 @@ def timeout(p):
     p.kill()
 
 
-def start_sniffer(netw_iface, path, logger):
+def start_sniffer(netw_iface, path, monitors):
     '''
     monitor broadcast and save anything to pcap dump files in /logs folder
     input:
@@ -255,11 +306,8 @@ def start_sniffer(netw_iface, path, logger):
     output:
         no
     '''
-    from random import randint
-    output = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
-    iwfaces = output.stdout.decode('utf-8')
-    new_iface = get_mon_iface_name(iwfaces)
-    logger.addToLine('start_sniffer', "new interface " + new_iface, 'log')
+    new_mon = monitors.push(netw_iface)
+    monitors.logger.addToLine('start_sniffer', "new interface " + new_mon, 'log')
     # --
     import os
     os.chdir(path + "/sniffed/")
@@ -269,18 +317,18 @@ def start_sniffer(netw_iface, path, logger):
             os.chdir(path + "/sniffed/")
             kill = lambda process: process.terminate()
             cmd = subprocess.Popen(["airodump-ng", new_iface, "--beacons", "--write", "beac_dump"])
-            timer = threading.Timer(5, kill, [cmd])
+            timer = Timer(5, kill, [cmd])
             try:
                 timer.start()
                 stdout, stderr = cmd.communicate()
             finally:
                 timer.cancel()
             i += 1
-        subprocess.run(["airmon-ng", "stop", new_iface], capture_output=False)
-        logger.addToLine('start_sniffer', "sniffing has been finished", 'log')
+        monitors.pop(new_mon)
+        monitors.logger.addToLine('start_sniffer', "sniffing has been finished", 'log')
 
     except Exception as e:
-        logger.addToLine('start_sniffer', str(e), 'error')
+        monitors.logger.addToLine('start_sniffer', str(e), 'error')
 
 
 def create_parser():
@@ -325,18 +373,6 @@ def get_available_wifaces():
         fw.write(wifaces.stdout.decode('utf-8'))
 
 
-def get_mon_iface_name(iwfaces):
-    from re import findall
-    try:
-        new_iface = findall(r'monitor\smode\s.+enabled\son\s.+', iwfaces)[0]
-        new_iface = findall(r'[a-z0-9]+$', new_iface)[0]
-        return new_iface
-
-    except Exception as e:
-        print(str(e))
-        print("no new monitor interface found")
-        return ''
-
 
 if __name__ == "__main__":
     import sys
@@ -347,7 +383,6 @@ if __name__ == "__main__":
     if not (namespace.send and namespace.listen):
         logger.addToLine('__main__', 'invalid input params\n', 'error')
         exit(1)
-
     try:
         # delete recent dump files
         logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
@@ -357,8 +392,11 @@ if __name__ == "__main__":
         cwd = create_folders()
         os.chdir(cwd)
         while True:
-            task1 = threading.Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
-            task2 = threading.Thread(target = start_sender, args=(namespace.send, cwd, logger))
+            print(1)
+            monitors = Monitors(logger)
+            print(2)
+            task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, monitors))
+            task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
             task1.start()
             sleep(5)
             # task2.start()
