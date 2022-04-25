@@ -116,7 +116,7 @@ class Monitor():
         except Exception as e:
             lock.acquire()
             self.log_client.addToLine('Monitors.get_mon_iface_name',\
-                "no new monitor interface found " + str(e), 'error')
+                "no new monitor interface found " + str(e) + '" with ' + iwfaces, 'error')
             lock.release()
             return ''
 
@@ -191,31 +191,42 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
     output:
         no
     '''
+    from pcapfile import savefile
+    from time import time
     packet_index = -1
     error_index = 0
     flag = False
+    lock.acquire()
     logger.addToLine('lookup_dump', pcap_dump + " file is being investigated", 'log')
+    lock.release()
     try:
         while True:
             try:
-                f = open(path + "/sniffed/" + pcap_dump, 'rb')
-                from pcapParser import load_savefile
-                caps, header = load_savefile(f)
+                f = open(path + "sniffed/" + pcap_dump, 'rb')
+                print(path + "sniffed/" + pcap_dump)
+                caps, header = savefile.load_savefile(f)
                 packets = caps.packets
                 # ------------------------------
-                from time import time
                 start = time()*1000
+                print(path + "sniffed/" + pcap_dump)
                 # ------------------------------
                 while time()*1000 - start <= 10:
                     packet_index += 1
-                    #print str(packet_index) + "     " + str(time()*1000 - start) + "start " + str(start)
-                    if flag == True and unhexlify(packets[packet_index][1].packet)[0] == b'\x80':    # if the packet is really a beacon
+                    lock.acquire()
+                    logger.addToLine('lookup_dump', str(packet_index) + "     " + \
+                                    str(time()*1000 - start) + "start " + str(start), 'log')
+                    lock.release()
+                    # if the packet is really a beacon
+                    if flag == True and unhexlify(packets[packet_index][1].packet)[0] == b'\x80':
                         essid_len = int(unhexlify(packets[packet_index][1].packet)[37].encode("hex"), 16)
                         # ---------
                         if essid_len != 0:
                             current_essid = (unhexlify(packets[packet_index][1].packet)[38: 38 + essid_len]).encode("ascii")
                             if (unhexlify(packets[packet_index][1].packet)[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
-                                print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
+                                lock.acquire()
+                                logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
+                                                " ESSID " + current_essid + " found", 'log')
+                                lock.release()
                                 cache.append(current_essid)
                                 # ------
                                 bssid = unhexlify((packets[packet_index][1].packet))[16: 22]
@@ -232,7 +243,11 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                         if essid_len != 0:
                             current_essid = (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]).encode("ascii")
                             if (unhexlify(packets[packet_index][1].packet)[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
-                                print ("in "  + str(packet_index + 1) + " ESSID " + current_essid + " found")
+                                lock.acquire()
+                                logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
+                                                " ESSID " + current_essid + " found", 'log')
+                                lock.release()
+
                                 cache.append(current_essid)
                                 # ------
                                 task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1)))
@@ -244,19 +259,24 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                 f.close()
 
             except IOError:
+                lock.acquire()
                 logger.addToLine('lookup_dump', pcap_dump + " file is not ready yet...", 'log')
+                lock.release()
                 sleep(2)
                 # --------
                 if error_index == 5:
+                    lock.acquire()
                     logger.addToLine('lookup_dump', "Waited too long, trying to scan the next file", 'err')
-                    print ("\nWaited too long, trying to scan the next file\n")
+                    lock.release()
                     return 0
                 # --------
                 error_index += 1
 
             except IndexError:
                 if flag == True:
+                    lock.acquire()
                     logger.addToLine('lookup_dump', 'Scan is done', 'log')
+                    lock.release()
                     break
                 else:
                     flag = True
@@ -395,20 +415,20 @@ if __name__ == "__main__":
         exit(1)
     try:
         # delete recent dump files
-        lock.acquire()
+        '''lock.acquire()
         logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
         lock.release()
-        exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
+        exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')'''
         # --
         # create dump folders and enter
-        cwd = create_folders()
+        cwd = '/home/bob/dev/python/WPA-handshake-collector/2022-04-08 18:49:24.553206/'#create_folders()
         os.chdir(cwd)
         while True:
             task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
-            task1.start()
-            sleep(5)
-            # task2.start()
+            '''task1.start()
+            sleep(5)'''
+            task2.start()
             lock.acquire()
             logger.addToLine('__main__', 'task1.is_alive: ' + str(task1.is_alive()), 'log')
             logger.addToLine('__main__', 'task2.is_alive: ' + str(task2.is_alive()), 'log')
