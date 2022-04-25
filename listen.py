@@ -210,8 +210,8 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                     packet_index += 1
                     _pack = unhexlify(packets[packet_index].packet)
                     lock.acquire()
-                    logger.addToLine('lookup_dump', str(packet_index) + "     " + \
-                                    str(time()*1000 - start) + "start " + str(start), 'log')
+                    logger.addToLine(
+                        'lookup_dump', f"{str(packet_index)}\t{str(time()*1000 - start)} passed", 'log')
                     lock.release()
                     # if the packet is really a beacon
                     if flag == True and _pack[0] == b'\x80':
@@ -221,8 +221,8 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                             current_essid = (_pack[38: 38 + essid_len]).encode("ascii")
                             if (_pack[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
                                 lock.acquire()
-                                logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
-                                                " ESSID " + current_essid + " found", 'log')
+                                logger.addToLine(
+                                    'lookup_dump', f"in {str(packet_index + 1)} ESSID {current_essid} found", 'log')
                                 lock.release()
                                 cache.append(current_essid)
                                 # ------
