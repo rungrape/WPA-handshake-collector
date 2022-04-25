@@ -206,41 +206,39 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                 capfile = load_savefile(f)
                 packets = capfile.packets
                 start = time()*1000
-                print(f"{path}sniffed/{pcap_dump}")
                 while time()*1000 - start <= 10:
                     packet_index += 1
-                    _curr_pack = unhexlify(packets[packet_index].packet)
+                    _pack = unhexlify(packets[packet_index].packet)
                     lock.acquire()
                     logger.addToLine('lookup_dump', str(packet_index) + "     " + \
                                     str(time()*1000 - start) + "start " + str(start), 'log')
                     lock.release()
                     # if the packet is really a beacon
-                    if flag == True and unhexlify(packets[packet_index].packet)[0] == b'\x80':
-                        essid_len = int(unhexlify(packets[packet_index].packet)[37].encode("hex"), 16)
+                    if flag == True and _pack[0] == b'\x80':
+                        essid_len = int(_pack[37].encode("hex"), 16)
                         # ---------
                         if essid_len != 0:
-                            current_essid = (unhexlify(packets[packet_index].packet)[38: 38 + essid_len]).encode("ascii")
-                            if (unhexlify(packets[packet_index].packet)[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
+                            current_essid = (_pack[38: 38 + essid_len]).encode("ascii")
+                            if (_pack[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
                                                 " ESSID " + current_essid + " found", 'log')
                                 lock.release()
                                 cache.append(current_essid)
                                 # ------
-                                bssid = unhexlify((packets[packet_index].packet))[16: 22]
-                                rates_len = int(unhexlify(packets[packet_index].packet)[38 + essid_len + 1].encode("hex"), 16)
+                                bssid = _pack[16: 22]
+                                rates_len = int(_pack[38 + essid_len + 1].encode("hex"), 16)
                                 channel = int(unhexlify((packets[packet_index].packet))[38 + essid_len + 1 + rates_len + 1 + 1 + 1].encode("hex"), 16)
-                                #print "\nBSSID: " + str(bssid) + " " + hexlify(bssid) + " of length " + str(len(bssid)) + "\n"
                                 task_AP = Thread(start_AP(current_essid, bssid, netw_iface, path, str(channel)))
                                 task_AP.start()
                         # ---------
                     
-                    elif flag == False and unhexlify(packets[packet_index].packet)[0] == b'\x40':  # or if the packet is really a probe request
-                        essid_len = int(unhexlify(packets[packet_index].packet)[25].encode("hex"), 16)
+                    elif flag == False and _pack[0] == b'\x40':  # or if the packet is really a probe request
+                        essid_len = int(_pack[25].encode("hex"), 16)
                         # ---------
                         if essid_len != 0:
-                            current_essid = (unhexlify(packets[packet_index].packet)[26: 26 + essid_len]).encode("ascii")
-                            if (unhexlify(packets[packet_index].packet)[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
+                            current_essid = (_pack[26: 26 + essid_len]).encode("ascii")
+                            if (_pack[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
                                                 " ESSID " + current_essid + " found", 'log')
