@@ -197,12 +197,12 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
     error_index = 0
     flag = False
     lock.acquire()
-    logger.addToLine('lookup_dump', pcap_dump + " file is being investigated", 'log')
+    logger.addToLine('lookup_dump', f"{path}/sniffed/{pcap_dump} file is being investigated", 'log')
     lock.release()
     try:
         while True:
             try:
-                f = open(f"{path}sniffed/{pcap_dump}", 'rb')
+                f = open(f"{path}/sniffed/{pcap_dump}", 'rb')
                 capfile = load_savefile(f)
                 packets = capfile.packets
                 start = time()*1000
@@ -416,13 +416,13 @@ if __name__ == "__main__":
         exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')'''
         # --
         # create dump folders and enter
-        cwd = '/home/bob/dev/python/WPA-handshake-collector/2022-04-08 18:49:24.553206/'#create_folders()
+        cwd = create_folders()#'/home/bob/dev/python/WPA-handshake-collector/2022-04-08 18:49:24.553206/'#
         os.chdir(cwd)
         while True:
             task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
-            '''task1.start()
-            sleep(5)'''
+            task1.start()
+            sleep(3)
             task2.start()
             lock.acquire()
             logger.addToLine('__main__', 'task1.is_alive: ' + str(task1.is_alive()), 'log')
