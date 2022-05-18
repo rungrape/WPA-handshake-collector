@@ -39,6 +39,20 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
         kill = lambda process: process.terminate()
         import os
         os.chdir(path + "/logs/")
+<<<<<<< HEAD
+=======
+        if bssid == b"\xff\xff\xff\xff\xff\xff":
+            lock.acquire()
+            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -c {channel} -F {essid} {new_mon}", 'log')
+            lock.release()
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
+        else:
+            lock.acquire()
+            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -a {hexlify(bssid)} -c {channel} -F {essid} {new_mon}", 'log')
+            lock.release()
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
+        timer = Timer(3, kill, [cmd])
+>>>>>>> 4efe12c... AP creation works well but unstable; ESSID bugs fixed, extra logging deleted
         try:
             if bssid == b"\xff\xff\xff\xff\xff\xff":
                 lock.acquire()
@@ -108,7 +122,10 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 print
                                 if current_essid[0] != 0:
                                     start_AP(current_essid, bssid, netw_iface, path, str(channel), logger)
+<<<<<<< HEAD
                                     sleep(1)
+=======
+>>>>>>> 4efe12c... AP creation works well but unstable; ESSID bugs fixed, extra logging deleted
 
                     # or if the packet is really a probe request
                     elif 64 == _pack[0]:
@@ -123,7 +140,10 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 lock.release()
                                 cache.append(current_essid)
                                 start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger)
+<<<<<<< HEAD
                                 sleep(1)
+=======
+>>>>>>> 4efe12c... AP creation works well but unstable; ESSID bugs fixed, extra logging deleted
 
                 f.close()
 
