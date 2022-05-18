@@ -34,24 +34,25 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
         new_mon = mon.push(netw_iface, channel)
         mon.logger.addToLine('start_AP', "new interface " + new_mon, 'log')
         lock.release()
+        sleep(1)
         
         kill = lambda process: process.terminate()
         import os
         os.chdir(path + "/logs/")
-        if bssid == b"\xff\xff\xff\xff\xff\xff":
-            lock.acquire()
-            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -c {channel} -F {essid} {new_mon}", 'log')
-            lock.release()
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
-        else:
-            lock.acquire()
-            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -a {hexlify(bssid)} -c {channel} -F {essid} {new_mon}", 'log')
-            lock.release()
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
-        timer = Timer(3, kill, [cmd])
         try:
+            if bssid == b"\xff\xff\xff\xff\xff\xff":
+                lock.acquire()
+                logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -c {channel} -F {essid} {new_mon}", 'log')
+                lock.release()
+                cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
+            else:
+                lock.acquire()
+                logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -a {hexlify(bssid)} -c {channel} -F {essid} {new_mon}", 'log')
+                lock.release()
+                cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
+            timer = Timer(3, kill, [cmd])
             timer.start()
-            if (bssid) != b"\xff\xff\xff\xff\xff\xff":
+            if bssid != b"\xff\xff\xff\xff\xff\xff":
                 subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", new_mon])
             stdout, stderr = cmd.communicate()
         finally:
@@ -59,8 +60,9 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
             subprocess.check_call(["airmon-ng", "stop", new_mon, channel])
 
     except Exception as e:
-       print(str(e) + " azaza")
-
+        lock.acquire()
+        logger.addToLine('start_AP', f"falled with params essid:{essid}, bssid:{bssid}, netw_iface:{netw_iface}, path:{path}, channel:{channel}", 'err')
+        lock.release()
 
 
 def lookup_dump(pcap_dump, netw_iface, path, logger):
@@ -106,6 +108,7 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 print
                                 if current_essid[0] != 0:
                                     start_AP(current_essid, bssid, netw_iface, path, str(channel), logger)
+                                    sleep(1)
 
                     # or if the packet is really a probe request
                     elif 64 == _pack[0]:
@@ -120,6 +123,7 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 lock.release()
                                 cache.append(current_essid)
                                 start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger)
+                                sleep(1)
 
                 f.close()
 
@@ -289,7 +293,7 @@ if __name__ == "__main__":
         while True:
             task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
-            # task1.start()
+            #task1.start()
             sleep(3)
             task2.start()
             lock.acquire()
