@@ -29,7 +29,7 @@ class Monitor():
             lock.release()
             return ''
 
-    def push(self, netw_iface):
+    def push(self, netw_iface, channel = 0):
         '''
         add new monitor
         input:
@@ -39,7 +39,15 @@ class Monitor():
         '''
         import subprocess
         from random import randint
-        air_out = subprocess.run(["airmon-ng", "start", netw_iface, str(randint(1, 14))], capture_output=True)
+        air_out = subprocess.run(
+            [
+                "airmon-ng",
+                "start",
+                netw_iface,
+                str(randint(1, 14)) if channel == 0 else channel
+            ],
+            capture_output=True
+            )
         air_out = air_out.stdout.decode('utf-8')
         new_iface = self.get_mon_iface_name(air_out)
         return new_iface
