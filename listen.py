@@ -39,8 +39,14 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
         import os
         os.chdir(path + "/logs/")
         if bssid == b"\xff\xff\xff\xff\xff\xff":
+            lock.acquire()
+            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -c {channel} -F {essid} {new_mon}", 'log')
+            lock.release()
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
         else:
+            lock.acquire()
+            logger.addToLine('start_AP', f"AP params airbase-ng --essid {essid} -a {hexlify(bssid)} -c {channel} -F {essid} {new_mon}", 'log')
+            lock.release()
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
         timer = Timer(3, kill, [cmd])
         try:
@@ -72,9 +78,6 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
     packet_index = -1
     error_index = 0
     flag = False
-    lock.acquire()
-    logger.addToLine('lookup_dump', f"{path}/sniffed/{pcap_dump} file is being investigated", 'log')
-    lock.release()
     try:
         while True:
             try:
@@ -85,31 +88,24 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                 while time()*1000 - start <= 10:
                     packet_index += 1
                     _pack = unhexlify(packets[packet_index].packet)
-                    lock.acquire()
-                    logger.addToLine(
-                        'lookup_dump', str(_pack), 'log')
-                    logger.addToLine(
-                        'lookup_dump', str(type(_pack[0]))+str(_pack[0]), 'log')
-                    logger.addToLine(
-                        'lookup_dump', str(type(b'\x80'))+str(b'\x80'), 'log')
-                    lock.release()
                     # if the packet is really a beacon
                     if 128 == _pack[0]:
                         essid_len = _pack[37]
                         if essid_len != 0:
                             current_essid = (_pack[38: 38 + essid_len]).decode("ascii")
-                            if _pack[38: 38 + essid_len] != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
+                            if _pack[38: 38 + essid_len] != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache) and (_pack[38] != 0):  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine(
-                                    'lookup_dump', f"in {str(packet_index + 1)} ESSID {current_essid} found", 'log')
+                                    'lookup_dump', f"in {str(packet_index + 1)} of {path}/sniffed/{pcap_dump} ESSID {current_essid} found", 'log')
                                 lock.release()
                                 cache.append(current_essid)
                                 # ------
                                 bssid = _pack[16: 22]
                                 rates_len = _pack[38 + essid_len + 1]
                                 channel = _pack[38 + essid_len + 1 + rates_len + 1 + 1 + 1]
-                                task_AP = Thread(start_AP(current_essid, bssid, netw_iface, path, str(channel), logger))
-                                task_AP.start()
+                                print
+                                if current_essid[0] != 0:
+                                    start_AP(current_essid, bssid, netw_iface, path, str(channel), logger)
 
                     # or if the packet is really a probe request
                     elif 64 == _pack[0]:
@@ -123,13 +119,8 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                                 " ESSID " + current_essid + " found", 'log')
                                 lock.release()
                                 cache.append(current_essid)
-                                # ------
-                                task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger))
-                                task_AP.start()
-                        # ---------
-                    
+                                start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger)
 
-                # ------------------------------
                 f.close()
 
             except IOError:
@@ -208,6 +199,9 @@ def start_sniffer(netw_iface, path, logger):
         while i < dump_num:
             os.chdir(path + "/sniffed/")
             kill = lambda process: process.terminate()
+            lock.acquire()
+            logger.addToLine('start_sniffer', f"sniffer params airodump-ng {new_mon} --beacons --write beac_dump", 'log')
+            lock.release()
             cmd = subprocess.Popen(["airodump-ng", new_mon, "--beacons", "--write", "beac_dump"])
             timer = Timer(5, kill, [cmd])
             try:
