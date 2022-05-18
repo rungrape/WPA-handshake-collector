@@ -29,11 +29,9 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
     '''
     try:
         import subprocess
-        # output = subprocess.run(["airmon-ng", "start", netw_iface, channel], capture_output=True)
-        # iwfaces = output.stdout.decode('utf-8')
         mon = Monitor(logger)
-        new_mon = mon.push(netw_iface, channel)
         lock.acquire()
+        new_mon = mon.push(netw_iface, channel)
         mon.logger.addToLine('start_AP', "new interface " + new_mon, 'log')
         lock.release()
         
@@ -44,7 +42,7 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid, "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
         else:
             cmd = subprocess.Popen(["airbase-ng", "--essid", essid,"-a", hexlify(bssid), "-c", channel, "-F", essid + "_log", "-Z", "4", new_mon])
-        timer = threading.Timer(3, kill, [cmd])
+        timer = Timer(3, kill, [cmd])
         try:
             timer.start()
             if (bssid) != b"\xff\xff\xff\xff\xff\xff":
@@ -53,10 +51,10 @@ def start_AP(essid, bssid, netw_iface, path, channel, logger):
         finally:
             timer.cancel()
             subprocess.check_call(["airmon-ng", "stop", new_mon, channel])
-            #subprocess.call(["python", path + "/converter_p.2.7.py", essid + "_log-01.cap", "hccap"])
 
     except Exception as e:
-       print (e)
+       print(str(e) + " azaza")
+
 
 
 def lookup_dump(pcap_dump, netw_iface, path, logger):
@@ -97,12 +95,10 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                     lock.release()
                     # if the packet is really a beacon
                     if 128 == _pack[0]:
-
                         essid_len = _pack[37]
-                        # ---------
                         if essid_len != 0:
                             current_essid = (_pack[38: 38 + essid_len]).decode("ascii")
-                            if (_pack[38: 38 + essid_len]) != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
+                            if _pack[38: 38 + essid_len] != b'\xff\xff\xff\xff\xff\xff' and not(current_essid in cache):  # if we've already seen this ESSID before
                                 lock.acquire()
                                 logger.addToLine(
                                     'lookup_dump', f"in {str(packet_index + 1)} ESSID {current_essid} found", 'log')
@@ -110,13 +106,13 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 cache.append(current_essid)
                                 # ------
                                 bssid = _pack[16: 22]
-                                rates_len = int(_pack[38 + essid_len + 1], 16)
+                                rates_len = _pack[38 + essid_len + 1]
                                 channel = _pack[38 + essid_len + 1 + rates_len + 1 + 1 + 1]
                                 task_AP = Thread(start_AP(current_essid, bssid, netw_iface, path, str(channel), logger))
                                 task_AP.start()
-                        # ---------
-                    
-                    elif 64 == _pack[0]:  # or if the packet is really a probe request
+
+                    # or if the packet is really a probe request
+                    elif 64 == _pack[0]:
                         essid_len = _pack[25]
                         # ---------
                         if essid_len != 0:
@@ -126,7 +122,6 @@ def lookup_dump(pcap_dump, netw_iface, path, logger):
                                 logger.addToLine('lookup_dump', "in "  + str(packet_index + 1) +\
                                                 " ESSID " + current_essid + " found", 'log')
                                 lock.release()
-
                                 cache.append(current_essid)
                                 # ------
                                 task_AP = Thread(start_AP(current_essid, b"\xff\xff\xff\xff\xff\xff", netw_iface, path, str(1), logger))
@@ -201,8 +196,8 @@ def start_sniffer(netw_iface, path, logger):
         no
     '''
     mon = Monitor(logger)
-    new_mon = mon.push(netw_iface)
     lock.acquire()
+    new_mon = mon.push(netw_iface)
     mon.logger.addToLine('start_sniffer', "new interface " + new_mon, 'log')
     lock.release()
     # --

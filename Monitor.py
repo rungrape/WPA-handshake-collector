@@ -23,10 +23,8 @@ class Monitor():
             return new_iface
 
         except Exception as e:
-            lock.acquire()
             self.log_client.addToLine('Monitors.get_mon_iface_name',\
                 "no new monitor interface found " + str(e) + '" with ' + iwfaces, 'error')
-            lock.release()
             return ''
 
     def push(self, netw_iface, channel = 0):
