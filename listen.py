@@ -268,9 +268,9 @@ def get_available_wifaces():
 
 
 if __name__ == "__main__":
-    import sys
+    from sys import argv
     parser = create_parser()
-    namespace = parser.parse_args(sys.argv[1:])
+    namespace = parser.parse_args(argv[1:])
     logger = Logger()
  
     if not (namespace.send and namespace.listen):
@@ -280,30 +280,29 @@ if __name__ == "__main__":
         exit(1)
     try:
         # delete recent dump files
-        '''lock.acquire()
+        lock.acquire()
         logger.addToLine('__main__', os.getcwd()+'/del_recent_dumps.sh', 'log')
         lock.release()
-        exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')'''
+        exit_code = subprocess.call(os.getcwd() + '/del_recent_dumps.sh')
         # --
         # create dump folders and enter
-        cwd = '/home/bob/dev/python/WPA-handshake-collector/WPA-handshake-collector/2022-05-18 19:35:58.447306'#create_folders()
+        cwd = create_folders()
         os.chdir(cwd)
         while True:
             task1 = Thread(target = start_sniffer, args=(namespace.listen, cwd, logger))
             task2 = Thread(target = start_sender, args=(namespace.send, cwd, logger))
-            #task1.start()
+            task1.start()
             sleep(3)
             task2.start()
             lock.acquire()
             logger.addToLine('__main__', 'task1.is_alive: ' + str(task1.is_alive()), 'log')
             logger.addToLine('__main__', 'task2.is_alive: ' + str(task2.is_alive()), 'log')
             lock.release()
-            if not (task1.is_alive() and task2.is_alive()):
+            task2.join()
+            if task1.is_alive() == False and task2.is_alive() == False:
                 break
 
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         logger.addToLine('__main__', str(e) + '\n' + str(tb), 'error')
-
-
